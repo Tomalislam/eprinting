@@ -500,16 +500,16 @@
       <i class="fas fa-print"></i>
     </div>
     <h1 class="login-title">Admin Login</h1>
-    <form class="login-form">
+    <form class="login-form" id="loginFormElement">
       <div class="form-group">
         <label for="adminEmail" class="form-label">Email Address</label>
-        <input type="email" id="adminEmail" class="form-control" placeholder="Enter your email">
+        <input type="email" id="adminEmail" class="form-control" placeholder="Enter your email" required>
       </div>
       <div class="form-group">
         <label for="adminPassword" class="form-label">Password</label>
-        <input type="password" id="adminPassword" class="form-control" placeholder="Enter your password">
+        <input type="password" id="adminPassword" class="form-control" placeholder="Enter your password" required>
       </div>
-      <button type="button" id="loginBtn" class="login-btn">Sign In</button>
+      <button type="submit" id="loginBtn" class="login-btn">Sign In</button>
     </form>
   </div>
 
@@ -549,7 +549,7 @@
           <i class="fas fa-cog"></i>
           Settings
         </div>
-        <div class="nav-item">
+        <div class="nav-item" id="logoutBtn">
           <i class="fas fa-sign-out-alt"></i>
           Logout
         </div>
@@ -694,154 +694,5 @@
       </div>
     </div>
   </div>
-
-  <script>
-    // Sample order data for demonstration
-    const sampleOrders = [
-      {
-        id: '#ORD-001',
-        name: 'John Doe',
-        address: '123 Main St, Dhaka',
-        phone: '01712345678',
-        driveLink: 'https://drive.google.com/...',
-        totalPrice: 450,
-        deliverySystem: 'Home Delivery',
-        deliveryCharge: 60,
-        status: 'Order Confirmed',
-        date: '2023-06-15'
-      },
-      {
-        id: '#ORD-002',
-        name: 'Jane Smith',
-        address: '456 Park Ave, Chittagong',
-        phone: '01898765432',
-        driveLink: 'https://drive.google.com/...',
-        totalPrice: 780,
-        deliverySystem: 'Sundorbon Delivery',
-        deliveryCharge: 90,
-        status: 'Printing Your Order',
-        date: '2023-06-14'
-      },
-      {
-        id: '#ORD-003',
-        name: 'Robert Johnson',
-        address: '789 Oak Ln, Sylhet',
-        phone: '01911223344',
-        driveLink: 'https://drive.google.com/...',
-        totalPrice: 1200,
-        deliverySystem: 'Home Delivery',
-        deliveryCharge: 80,
-        status: 'Delivered',
-        date: '2023-06-10'
-      }
-    ];
-
-    // Function to render orders
-    function renderOrders(orders) {
-      const orderList = document.getElementById('orderList');
-      orderList.innerHTML = '';
-      
-      orders.forEach(order => {
-        const statusClass = getStatusClass(order.status);
-        
-        const orderCard = document.createElement('div');
-        orderCard.className = 'order-card';
-        orderCard.innerHTML = `
-          <div class="order-header">
-            <div class="order-id">${order.id}</div>
-            <div class="order-status ${statusClass}">${order.status}</div>
-          </div>
-          <div class="order-details">
-            <div class="detail-row">
-              <span class="detail-label">Customer:</span>
-              <span class="detail-value">${order.name}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Phone:</span>
-              <span class="detail-value">${order.phone}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Delivery:</span>
-              <span class="detail-value">${order.deliverySystem} (৳${order.deliveryCharge})</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Total:</span>
-              <span class="detail-value">৳${order.totalPrice + order.deliveryCharge}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Date:</span>
-              <span class="detail-value">${order.date}</span>
-            </div>
-          </div>
-          <div class="order-actions">
-            <button class="btn btn-outline">
-              <i class="fas fa-edit"></i> Edit
-            </button>
-            <button class="btn btn-danger">
-              <i class="fas fa-trash"></i> Delete
-            </button>
-          </div>
-        `;
-        
-        orderList.appendChild(orderCard);
-      });
-    }
-
-    // Helper function to get status class
-    function getStatusClass(status) {
-      switch(status) {
-        case 'Order Confirmed': return 'status-confirmed';
-        case 'Printing Your Order': return 'status-printing';
-        case 'Your Order Has Been Printed': return 'status-printed';
-        case 'Ready for Shipping': return 'status-shipping';
-        case 'Shipped': return 'status-shipped';
-        case 'Delivered': return 'status-delivered';
-        default: return '';
-      }
-    }
-
-    // Tab switching functionality
-    document.addEventListener('DOMContentLoaded', function() {
-      // For demo purposes - show some sample orders
-      renderOrders(sampleOrders);
-      
-      // Tab switching
-      const tabs = ['dashboardTab', 'addNewOrderTab', 'allOrdersTab'];
-      const sections = ['dashboardSection', 'addOrderSection', 'orderListSection'];
-      
-      tabs.forEach(tabId => {
-        const tab = document.getElementById(tabId);
-        if (tab) {
-          tab.addEventListener('click', function() {
-            // Update active tab
-            document.querySelectorAll('.nav-item').forEach(item => {
-              item.classList.remove('active');
-            });
-            this.classList.add('active');
-            
-            // Show corresponding section
-            const sectionIndex = tabs.indexOf(tabId);
-            sections.forEach((sectionId, index) => {
-              const section = document.getElementById(sectionId);
-              if (sectionIndex === index) {
-                section.classList.remove('hidden');
-              } else {
-                section.classList.add('hidden');
-              }
-            });
-          });
-        }
-      });
-      
-      // Login button functionality (demo)
-      const loginBtn = document.getElementById('loginBtn');
-      if (loginBtn) {
-        loginBtn.addEventListener('click', function() {
-          document.getElementById('loginForm').classList.add('hidden');
-          document.getElementById('adminPanel').classList.remove('hidden');
-        });
-      }
-    });
-  </script>
 </body>
 </html>

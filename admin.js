@@ -14,254 +14,133 @@ import {
     deleteDoc 
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-// Global Variables
-let editMode = false;
-let currentEditId = null;
-let totalCosts = 0;
-let window.ordersData = [];
-
 // DOM Elements
-const loginFormElement = document.getElementById('loginFormElement');
-const addOrderBtn = document.getElementById('addOrderBtn');
-const orderList = document.getElementById('orderList');
-const searchInput = document.getElementById('searchInput');
-const logoutBtn = document.getElementById('logoutBtn');
+let orderList, recentOrders, costsList, searchOrders;
 
-// Status Configuration
-const statusClasses = {
-    'Order Confirmed': 'status-confirmed',
-    'Printing Your Order': 'status-printing',
-    'Printed - Awaiting Payment': 'status-printed',
-    'Your Order Has Been Printed': 'status-printed',
-    'Ready for Shipping': 'status-shipping',
-    'Shipped': 'status-shipped',
-    'Delivered': 'status-delivered'
-};
+// Global State
+let currentUser = null;
+let orders = [];
+let costs = [];
 
-// Initialize App
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize DOM elements
+    orderList = document.getElementById('orderList');
+    recentOrders = document.getElementById('recentOrders');
+    costsList = document.getElementById('costsList');
+    searchOrders = document.getElementById('searchOrders');
+
     auth.onAuthStateChanged(user => {
+        currentUser = user;
         if (user) {
-            showAdminPanel();
-            loadInitialData();
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('adminPanel').classList.remove('hidden');
+            loadAllData();
         } else {
-            showLoginForm();
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('adminPanel').classList.add('hidden');
         }
     });
 
-    // Event Listeners
-    loginFormElement?.addEventListener('submit', handleLogin);
-    addOrderBtn?.addEventListener('click', handleAddOrder);
-    logoutBtn?.addEventListener('click', handleLogout);
-    document.getElementById('viewAllOrders')?.addEventListener('click', () => showSection('allOrdersTab'));
-    document.getElementById('costsTab')?.addEventListener('click', () => showSection('costsTab'));
-    document.addEventListener('change', handleStatusChange);
-    searchInput?.addEventListener('input', filterOrders);
+    // Event Delegation
+    document.addEventListener('click', handleButtonClicks);
+    document.addEventListener('change', handleStatusChanges);
+    searchOrders?.addEventListener('input', filterOrders);
 });
 
-// Authentication Functions
-async function handleLogin(e) {
-    e.preventDefault();
-    const email = document.getElementById('adminEmail').value.trim();
-    const password = document.getElementById('adminPassword').value.trim();
-
+async function loadAllData() {
     try {
-        await signInWithEmailAndPassword(auth, email, password);
+        await Promise.all([loadOrders(), loadCosts()]);
+        updateDashboard();
+        displayRecentOrders();
     } catch (error) {
-        alert("Login Failed: " + error.message);
-        document.getElementById('adminPassword').value = '';
-    }
-}
-
-async function handleLogout() {
-    try {
-        await signOut(auth);
-    } catch (error) {
-        alert("Logout Failed: " + error.message);
+        console.error("Initialization error:", error);
     }
 }
 
 // Order Management
-async function handleAddOrder() {
-    const orderData = {
-        name: document.getElementById('name').value.trim(),
-        address: document.getElementById('address').value.trim(),
-        phone: document.getElementById('phone').value.trim(),
-        drive_link: document.getElementById('driveLink').value.trim(),
-        total_price: Number(document.getElementById('totalPrice').value) || 0,
-        delivery_system: document.getElementById('deliverySystem').value,
-        delivery_charge: Number(document.getElementById('deliveryCharge').value) || 0,
-        due_amount: Number(document.getElementById('dueAmount').value) || 0,
-        status: 'Order Confirmed',
-        order_id: generateOrderID(),
-        created_at: new Date().toISOString()
-    };
-
-    if (!validateOrder(orderData)) return;
-
-    try {
-        await addDoc(collection(db, "orders"), orderData);
-        alert("Order added!");
-        clearOrderForm();
-        loadOrders();
-    } catch (error) {
-        alert("Error adding order: " + error.message);
-    }
-}
-
-async function deleteOrder(orderId) {
-    if (!confirm("Delete this order?")) return;
-    
-    try {
-        await deleteDoc(doc(db, "orders", orderId));
-        loadOrders();
-    } catch (error) {
-        alert("Delete failed: " + error.message);
-    }
-}
-
 async function loadOrders() {
     try {
-        const ordersRef = collection(db, "orders");
-        const q = query(ordersRef, orderBy("created_at", "desc"));
-        const snapshot = await getDocs(q);
-
-        window.ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        displayOrders();
-        updateDashboard();
+        const snapshot = await getDocs(query(collection(db, "orders"), orderBy("created_at", "desc"));
+        orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (orderList) orderList.innerHTML = orders.map(createOrderCard).join('');
     } catch (error) {
-        alert("Error loading orders: " + error.message);
+        handleError("Failed to load orders", error);
     }
 }
 
-// Costs Management
-async function addCost() {
-    const costData = {
-        amount: Number(document.getElementById('costAmount').value),
-        category: document.getElementById('costCategory').value.trim(),
-        description: document.getElementById('costDescription').value.trim(),
-        date: new Date().toISOString()
-    };
-
-    try {
-        await addDoc(collection(db, "costs"), costData);
-        loadCosts();
-    } catch (error) {
-        alert("Error adding cost: " + error.message);
-    }
-}
-
-async function loadCosts() {
-    try {
-        const costsRef = collection(db, "costs");
-        const q = query(costsRef, orderBy("date", "desc"));
-        const snapshot = await getDocs(q);
-
-        totalCosts = snapshot.docs.reduce((sum, doc) => sum + doc.data().amount, 0);
-        updateDashboard();
-    } catch (error) {
-        alert("Error loading costs: " + error.message);
-    }
-}
-
-// Status Handling
-async function handleStatusChange(event) {
-    const select = event.target;
-    if (!select.classList.contains('status-select')) return;
-
-    const orderId = select.closest('.order-card').dataset.id;
-    const newStatus = select.value;
-
-    try {
-        await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-        loadOrders();
-    } catch (error) {
-        alert("Status update failed: " + error.message);
-    }
-}
-
-// Dashboard Functions
-function updateDashboard() {
-    const revenue = window.ordersData.reduce((sum, o) => sum + o.total_price, 0);
-    const deliveryCosts = window.ordersData.reduce((sum, o) => sum + o.delivery_charge, 0);
-    const netProfit = revenue - totalCosts - deliveryCosts;
-
-    document.getElementById('netProfitValue').textContent = `৳${netProfit}`;
-    document.getElementById('revenueValue').textContent = `৳${revenue}`;
-    document.getElementById('totalCostsValue').textContent = `৳${totalCosts}`;
-    document.getElementById('deliveryCostsValue').textContent = `৳${deliveryCosts}`;
-}
-
-function displayOrders() {
-    orderList.innerHTML = window.ordersData.map(order => `
+function createOrderCard(order) {
+    return `
         <div class="order-card" data-id="${order.id}">
             <div class="order-header">
                 <div class="order-id">${order.order_id}</div>
-                <select class="status-select" data-orderid="${order.id}">
-                    ${Object.keys(statusClasses).map(status => `
-                        <option value="${status}" ${status === order.status ? 'selected' : ''}>
-                            ${status}
-                        </option>
-                    `).join('')}
+                <select class="status-select">
+                    ${Object.keys(statusClasses)
+                        .map(status => `<option ${order.status === status ? 'selected' : ''}>${status}</option>`)
+                        .join('')}
                 </select>
             </div>
             <div class="order-details">
-                <div class="detail-row">
-                    <span>Customer:</span>
-                    <span>${order.name}</span>
-                </div>
-                <div class="detail-row">
-                    <span>Phone:</span>
-                    <span>${order.phone}</span>
-                </div>
-                <div class="detail-row">
-                    <span>Documents:</span>
-                    <a href="${order.drive_link}" target="_blank">View Files</a>
-                </div>
-                <div class="detail-row">
-                    <span>Total:</span>
-                    <span>৳${order.total_price + order.delivery_charge}</span>
-                </div>
-                ${order.due_amount > 0 ? `
-                    <div class="detail-row warning">
-                        <span>Due Amount:</span>
-                        <span>৳${order.due_amount}</span>
-                    </div>
-                ` : ''}
+                ${createOrderDetail('Customer', order.name)}
+                ${createOrderDetail('Phone', formatPhone(order.phone))}
+                ${createOrderDetail('Documents', `<a href="${order.drive_link}" target="_blank">View Files</a>`)}
+                ${createOrderDetail('Total', `৳${order.total_price + order.delivery_charge}`)}
+                ${order.due_amount > 0 ? createOrderDetail('Due', `৳${order.due_amount}`, 'warning') : ''}
             </div>
             <div class="order-actions">
-                <button class="btn btn-danger" onclick="deleteOrder('${order.id}')">
-                    <i class="fas fa-trash"></i> Delete
-                </button>
+                <button class="btn btn-danger delete-btn">Delete</button>
             </div>
         </div>
-    `).join('');
+    `;
+}
+
+// Cost Management
+async function loadCosts() {
+    try {
+        const snapshot = await getDocs(query(collection(db, "costs"), orderBy("date", "desc"));
+        costs = snapshot.docs.map(doc => doc.data());
+        updateDashboard();
+    } catch (error) {
+        handleError("Failed to load costs", error);
+    }
+}
+
+// Event Handlers
+function handleButtonClicks(e) {
+    const card = e.target.closest('.order-card');
+    if (!card) return;
+
+    const orderId = card.dataset.id;
+    
+    if (e.target.classList.contains('delete-btn')) {
+        deleteOrder(orderId);
+    }
+}
+
+async function handleStatusChanges(e) {
+    if (e.target.classList.contains('status-select')) {
+        const orderId = e.target.closest('.order-card').dataset.id;
+        const newStatus = e.target.value;
+        
+        try {
+            await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+            loadOrders();
+        } catch (error) {
+            handleError("Status update failed", error);
+        }
+    }
 }
 
 // Helper Functions
-function generateOrderID() {
-    return 'ORD' + Date.now().toString().slice(-6);
+function formatPhone(phone) {
+    return phone.replace(/(\d{4})(\d{3})(\d{4})/, '$1-$2-$3');
 }
 
-function clearOrderForm() {
-    ['name', 'address', 'phone', 'driveLink', 'totalPrice', 'deliveryCharge', 'dueAmount']
-        .forEach(id => document.getElementById(id).value = '');
+function handleError(message, error) {
+    console.error(message, error);
+    alert(`${message}: ${error.message}`);
 }
 
-function validateOrder(order) {
-    const required = ['name', 'address', 'phone', 'drive_link'];
-    return required.every(field => !!order[field]);
-}
-
-function filterOrders() {
-    const term = searchInput.value.toLowerCase();
-    const filtered = window.ordersData.filter(order => 
-        order.name.toLowerCase().includes(term) ||
-        order.phone.includes(term) ||
-        order.order_id.toLowerCase().includes(term)
-    );
-    displayOrders(filtered);
-}
+// Initialize all remaining functions (updateDashboard, filterOrders, etc.)
 
 // UI Functions
 function showAdminPanel() {

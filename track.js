@@ -4,7 +4,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/fireba
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 
 const firebaseConfig = {
-    // YOUR firebase config
+    apiKey: "AIzaSyD2oTeRHgWwA2RvBVQZWcBhi3UNw9l3w2Y",
+    authDomain: "e-printing-3ca34.firebaseapp.com",
+    projectId: "e-printing-3ca34",
+    storageBucket: "e-printing-3ca34.appspot.com",  // ✅ Corrected!
+    messagingSenderId: "51071340726",
+    appId: "1:51071340726:web:aa1a604db26a3c9d9a1617",
+    measurementId: "G-G0LSVYTBHJ"
 };
 
 const app = initializeApp(firebaseConfig);

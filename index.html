@@ -131,18 +131,21 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Track Your Order</h1>
-            <p>Enter your registered phone number to check order status</p>
-        </div>
-
-        <div class="tracking-form">
-            <input type="tel" id="phoneInput" class="phone-input" placeholder="+880 1XXX-XXXXXX" pattern="[+]?880[0-9]{10}">
-            <button id="trackBtn" class="track-btn">
-                <i class="fas fa-search"></i> Track Order
-            </button>
-        </div>
+   <!-- Update the tracking form section -->
+<div class="tracking-form">
+    <select id="searchType" class="search-type">
+        <option value="phone">Search by Phone</option>
+        <option value="orderId">Search by Order ID</option>
+    </select>
+    <input type="text" 
+           id="searchInput" 
+           class="search-input" 
+           placeholder="01XXXXXXXXX or Order ID"
+           pattern="(01\d{9}|ORD\d+)">
+    <button id="trackBtn" class="track-btn">
+        <i class="fas fa-search"></i> Track Order
+    </button>
+</div>
 
         <div id="loading" class="loading hidden">
             <i class="fas fa-spinner fa-spin"></i> Searching for orders...

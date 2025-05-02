@@ -2,23 +2,155 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Track Your Order</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Tracking - E Printing Service</title>
     <script type="module" src="firebase-config.js"></script>
     <script type="module" src="customer.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --success: #4cc9f0;
+            --warning: #f72585;
+            --dark: #212529;
+            --light: #f8f9fa;
+            --gray: #6c757d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: #f5f7fa;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .tracking-form {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .phone-input {
+            flex: 1;
+            padding: 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .track-btn {
+            padding: 1rem 2rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .track-btn:hover {
+            background: var(--secondary);
+        }
+
+        .order-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid var(--primary);
+        }
+
+        .order-status {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .detail-label {
+            color: var(--gray);
+            font-weight: 500;
+        }
+
+        .detail-value {
+            color: var(--dark);
+            text-align: right;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--gray);
+        }
+
+        .error {
+            color: var(--warning);
+            text-align: center;
+            margin: 1rem 0;
+        }
+
+        .status-confirmed { background: rgba(76, 201, 240, 0.1); color: #4cc9f0; }
+        .status-printing { background: rgba(67, 97, 238, 0.1); color: #4361ee; }
+        .status-printed { background: rgba(60, 183, 120, 0.1); color: #3cb778; }
+        .status-shipping { background: rgba(255, 193, 7, 0.1); color: #ffc107; }
+        .status-shipped { background: rgba(247, 37, 133, 0.1); color: #f72585; }
+        .status-delivered { background: rgba(40, 167, 69, 0.1); color: #28a745; }
+    </style>
 </head>
 <body>
-    <h1>Track Your Order</h1>
-    <input type="text" id="phoneInput" placeholder="Enter your phone number">
-    <button id="trackBtn">Track</button>
-    
-    <div id="orderDetails" style="display:none;">
-        <h2>Order Details</h2>
-        <p id="name"></p>
-        <p id="address"></p>
-        <p id="driveLink"></p>
-        <p id="deliverySystem"></p>
-        <p id="totalPrice"></p>
-        <p id="status"></p>
+    <div class="container">
+        <div class="header">
+            <h1>Track Your Order</h1>
+            <p>Enter your registered phone number to check order status</p>
+        </div>
+
+        <div class="tracking-form">
+            <input type="tel" id="phoneInput" class="phone-input" placeholder="+880 1XXX-XXXXXX" pattern="[+]?880[0-9]{10}">
+            <button id="trackBtn" class="track-btn">
+                <i class="fas fa-search"></i> Track Order
+            </button>
+        </div>
+
+        <div id="loading" class="loading hidden">
+            <i class="fas fa-spinner fa-spin"></i> Searching for orders...
+        </div>
+
+        <div id="errorMessage" class="error hidden"></div>
+
+        <div id="ordersContainer"></div>
     </div>
 </body>
 </html>

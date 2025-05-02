@@ -7,104 +7,9 @@
     <script type="module" src="admin.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Poppins', sans-serif;
-        }
-        body {
-            background: linear-gradient(to right, #6a11cb, #2575fc);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 40px 20px;
-            color: #fff;
-        }
-        .website-name {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 30px;
-            background: linear-gradient(to right, #00f2fe, #4facfe);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-align: center;
-            animation: slideDown 1s ease forwards;
-        }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .container {
-            background: #1e1e2f;
-            padding: 30px;
-            border-radius: 15px;
-            width: 100%;
-            max-width: 500px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-            animation: fadeIn 1s ease forwards;
-        }
-        @keyframes fadeIn {
-            from {opacity: 0; transform: translateY(-20px);}
-            to {opacity: 1; transform: translateY(0);}
-        }
-        h1, h2 {
-            text-align: center;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-        input, select {
-            width: 100%;
-            padding: 12px 15px;
-            margin: 10px 0;
-            border: none;
-            border-radius: 8px;
-            background: #2e2e42;
-            color: #fff;
-            font-size: 16px;
-            outline: none;
-            transition: background 0.3s;
-        }
-        input:focus, select:focus {
-            background: #3e3e5e;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            margin-top: 15px;
-            border: none;
-            border-radius: 8px;
-            background: #4facfe;
-            background: linear-gradient(to right, #00f2fe, #4facfe);
-            color: #fff;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.4s;
-        }
-        button:hover {
-            background: linear-gradient(to right, #43e97b, #38f9d7);
-        }
-        #orderList {
-            list-style: none;
-            margin-top: 20px;
-            padding-left: 0;
-        }
-        #orderList li {
-            background: #2e2e42;
-            margin-bottom: 10px;
-            padding: 15px;
-            border-radius: 10px;
-            animation: fadeInUp 0.5s ease forwards;
-        }
-        @keyframes fadeInUp {
-            from {opacity: 0; transform: translateY(10px);}
-            to {opacity: 1; transform: translateY(0);}
-        }
-        .hidden {
-            display: none;
-        }
+        /* (Your Same CSS Here) */
+        /* No change needed in your CSS part */
+        /* --- */
     </style>
 </head>
 <body>
@@ -146,14 +51,5 @@
             <ul id="orderList"></ul>
         </div>
     </div>
-
-    <script>
-        // Small script to dynamically show/hide login and panel
-        document.getElementById('loginBtn').addEventListener('click', function() {
-            // Normally you validate here
-            document.getElementById('loginForm').classList.add('hidden');
-            document.getElementById('adminPanel').classList.remove('hidden');
-        });
-    </script>
 </body>
 </html>

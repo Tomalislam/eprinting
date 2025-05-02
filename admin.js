@@ -66,7 +66,7 @@ addOrderBtn.addEventListener('click', async () => {
 function generateOrderID() {
     const timestamp = Date.now().toString().slice(-5);
     const randomPart = Math.floor(1000 + Math.random() * 9000);
-    return ORD${timestamp}${randomPart};
+    return `ORD${timestamp}${randomPart}`;
 }
 
 function clearOrderForm() {
@@ -112,7 +112,7 @@ function displayOrders(orders) {
     orderList.innerHTML = "";
     orders.forEach(order => {
         const li = document.createElement('li');
-        li.innerHTML = 
+        li.innerHTML = `
             <strong>Order ID:</strong> ${order.order_id}<br>
             <strong>Name:</strong> <span class="name">${order.name}</span><br>
             <strong>Phone:</strong> <span class="phone">${order.phone}</span><br>
@@ -132,7 +132,7 @@ function displayOrders(orders) {
             </select><br>
 
             <button class="edit-button" onclick="enableEditing('${order.id}', this)">Edit</button>
-        ;
+        `;
         orderList.appendChild(li);
     });
 }

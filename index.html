@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Track Your Order</title>
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="customer.js"></script>
+</head>
+<body>
+    <h1>Track Your Order</h1>
+    <input type="text" id="phoneInput" placeholder="Enter your phone number">
+    <button id="trackBtn">Track</button>
+    
+    <div id="orderDetails" style="display:none;">
+        <h2>Order Details</h2>
+        <p id="name"></p>
+        <p id="address"></p>
+        <p id="driveLink"></p>
+        <p id="deliverySystem"></p>
+        <p id="totalPrice"></p>
+        <p id="status"></p>
+    </div>
+</body>
+</html>

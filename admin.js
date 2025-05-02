@@ -1,70 +1,44 @@
 import { db, auth } from './firebase-config.js';
-import { 
-  signInWithEmailAndPassword, 
-  setPersistence, 
-  browserLocalPersistence,
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { 
-  collection, 
-  addDoc, 
-  getDocs, 
-  updateDoc, 
-  doc, 
-  query, 
-  orderBy,
-  deleteDoc
-} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-
-// Set persistence to local storage
-setPersistence(auth, browserLocalPersistence)
-  .then(() => {
-    console.log("Auth persistence set to local");
-  })
-  .catch((error) => {
-    console.error("Error setting persistence:", error);
-  });
+import { signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { collection, addDoc, getDocs, updateDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // DOM Elements
-const loginBtn = document.getElementById('loginBtn');
+const loginFormElement = document.getElementById('loginFormElement');
 const addOrderBtn = document.getElementById('addOrderBtn');
 const loginForm = document.getElementById('loginForm');
 const adminPanel = document.getElementById('adminPanel');
 const orderList = document.getElementById('orderList');
-const addNewOrderTab = document.getElementById('addNewOrderTab');
-const allOrdersTab = document.getElementById('allOrdersTab');
-const dashboardTab = document.getElementById('dashboardTab');
 const searchInput = document.getElementById('searchInput');
 const logoutBtn = document.getElementById('logoutBtn');
 
-// Initialize the app
 document.addEventListener('DOMContentLoaded', () => {
-  // Check auth state
-  onAuthStateChanged(auth, (user) => {
+  auth.onAuthStateChanged(user => {
     if (user) {
-      // User is signed in
-      console.log("User logged in:", user.email);
-      handleSuccessfulLogin();
+      loginForm.classList.add('hidden');
+      adminPanel.classList.remove('hidden');
+      loadOrders();
+      showDashboard();
     } else {
-      // User is signed out
-      console.log("No user logged in");
       loginForm.classList.remove('hidden');
       adminPanel.classList.add('hidden');
     }
   });
 
   // Event Listeners
-  if (loginBtn) loginBtn.addEventListener('click', handleLogin);
+  if (loginFormElement) {
+    loginFormElement.addEventListener('submit', handleLogin);
+  }
+  
   if (addOrderBtn) addOrderBtn.addEventListener('click', addOrder);
-  if (addNewOrderTab) addNewOrderTab.addEventListener('click', showAddOrder);
-  if (allOrdersTab) allOrdersTab.addEventListener('click', showAllOrders);
-  if (dashboardTab) dashboardTab.addEventListener('click', showDashboard);
+  document.getElementById('addNewOrderTab')?.addEventListener('click', showAddOrder);
+  document.getElementById('allOrdersTab')?.addEventListener('click', showAllOrders);
+  document.getElementById('dashboardTab')?.addEventListener('click', showDashboard);
   if (searchInput) searchInput.addEventListener('input', filterOrders);
   if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
 });
 
-async function handleLogin() {
+async function handleLogin(e) {
+  e.preventDefault();
   const email = document.getElementById('adminEmail').value.trim();
   const password = document.getElementById('adminPassword').value.trim();
 
@@ -75,28 +49,17 @@ async function handleLogin() {
 
   try {
     await signInWithEmailAndPassword(auth, email, password);
-    handleSuccessfulLogin();
   } catch (error) {
-    console.error("Login error:", error);
     alert("Login Failed: " + error.message);
+    document.getElementById('adminPassword').value = '';
   }
-}
-
-function handleSuccessfulLogin() {
-  loginForm.classList.add('hidden');
-  adminPanel.classList.remove('hidden');
-  loadOrders();
-  showDashboard();
 }
 
 async function handleLogout() {
   try {
     await signOut(auth);
-    loginForm.classList.remove('hidden');
-    adminPanel.classList.add('hidden');
   } catch (error) {
-    console.error("Logout error:", error);
-    alert("Logout failed: " + error.message);
+    alert("Logout Failed: " + error.message);
   }
 }
 
@@ -126,7 +89,6 @@ async function addOrder() {
     clearOrderForm();
     loadOrders();
   } catch (error) {
-    console.error("Add order error:", error);
     alert("Failed to add order: " + error.message);
   }
 }
@@ -152,7 +114,6 @@ function showDashboard() {
   document.querySelectorAll('.content-area > div').forEach(div => div.classList.add('hidden'));
   document.getElementById('dashboardSection').classList.remove('hidden');
   updateActiveNav('dashboardTab');
-  updateStats();
 }
 
 function showAddOrder() {
@@ -178,7 +139,7 @@ async function loadOrders() {
     const ordersRef = collection(db, "orders");
     const q = query(ordersRef, orderBy("created_at", "desc"));
     const querySnapshot = await getDocs(q);
-    
+
     window.ordersData = [];
     querySnapshot.forEach((docSnap) => {
       window.ordersData.push({ id: docSnap.id, ...docSnap.data() });
@@ -187,14 +148,14 @@ async function loadOrders() {
     displayOrders(window.ordersData);
     updateStats();
   } catch (error) {
-    console.error("Load orders error:", error);
+    console.error("Error loading orders: ", error);
     alert("Failed to load orders: " + error.message);
   }
 }
 
 function displayOrders(orders) {
   if (!orderList) return;
-  
+
   orderList.innerHTML = orders.map(order => `
     <div class="order-card" data-id="${order.id}">
       <div class="order-header">
@@ -215,7 +176,7 @@ function displayOrders(orders) {
           <span class="detail-value editable" data-field="address">${order.address}</span>
         </div>
         <div class="detail-row">
-          <span class="detail-label">Files:</span>
+          <span class="detail-label">Drive Link:</span>
           <span class="detail-value editable" data-field="drive_link">
             <a href="${order.drive_link}" target="_blank">View Files</a>
           </span>
@@ -227,10 +188,6 @@ function displayOrders(orders) {
         <div class="detail-row">
           <span class="detail-label">Delivery:</span>
           <span class="detail-value">${order.delivery_system} (৳${order.delivery_charge})</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Date:</span>
-          <span class="detail-value">${new Date(order.created_at).toLocaleString()}</span>
         </div>
       </div>
       <div class="order-actions">
@@ -244,48 +201,38 @@ function displayOrders(orders) {
     </div>
   `).join('');
 
-  // Add event listeners to edit buttons
+  // Add event listeners to all edit buttons
   document.querySelectorAll('.edit-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       const orderCard = this.closest('.order-card');
-      toggleEditMode(orderCard);
-    });
-  });
-
-  // Add event listeners to delete buttons
-  document.querySelectorAll('.delete-btn').forEach(btn => {
-    btn.addEventListener('click', async function() {
-      const orderCard = this.closest('.order-card');
-      const orderId = orderCard.dataset.id;
-      if (confirm("Are you sure you want to delete this order?")) {
-        try {
-          await deleteDoc(doc(db, "orders", orderId));
-          orderCard.remove();
-          updateStats();
-        } catch (error) {
-          console.error("Delete error:", error);
-          alert("Failed to delete order: " + error.message);
-        }
-      }
+      enableEditing(orderCard);
     });
   });
 }
 
-function toggleEditMode(orderCard) {
+function getStatusClass(status) {
+  switch(status) {
+    case 'Order Confirmed': return 'status-confirmed';
+    case 'Printing Your Order': return 'status-printing';
+    case 'Your Order Has Been Printed': return 'status-printed';
+    case 'Ready for Shipping': return 'status-shipping';
+    case 'Shipped': return 'status-shipped';
+    case 'Delivered': return 'status-delivered';
+    default: return '';
+  }
+}
+
+function enableEditing(orderCard) {
   const orderId = orderCard.dataset.id;
   const editBtn = orderCard.querySelector('.edit-btn');
-  
+
   if (editBtn.innerHTML.includes('Save')) {
-    // Save changes
     saveChanges(orderId, orderCard);
     editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
   } else {
-    // Enter edit mode
     orderCard.querySelectorAll('.editable').forEach(el => {
       const field = el.dataset.field;
-      const value = field === 'drive_link' 
-        ? el.querySelector('a')?.href || '' 
-        : el.textContent.trim();
+      const value = el.textContent || el.querySelector('a')?.href || '';
       
       if (field === 'drive_link') {
         el.innerHTML = `<input type="text" class="form-control" value="${value}" data-field="${field}">`;
@@ -311,14 +258,13 @@ async function saveChanges(orderId, orderCard) {
     await updateDoc(orderRef, updatedData);
     loadOrders();
   } catch (error) {
-    console.error("Save changes error:", error);
     alert("Failed to update order: " + error.message);
   }
 }
 
 function filterOrders() {
   const keyword = searchInput.value.toLowerCase();
-  const filtered = window.ordersData.filter(order =>
+  const filtered = window.ordersData.filter(order => 
     order.name.toLowerCase().includes(keyword) ||
     order.phone.toLowerCase().includes(keyword) ||
     order.order_id.toLowerCase().includes(keyword)
@@ -328,7 +274,7 @@ function filterOrders() {
 
 function updateStats() {
   if (!window.ordersData) return;
-  
+
   const totalOrders = window.ordersData.length;
   const pendingOrders = window.ordersData.filter(order => 
     order.status !== 'Delivered'
@@ -340,26 +286,13 @@ function updateStats() {
     sum + order.total_price + order.delivery_charge, 0
   );
 
-  // Update stats cards
-  const updateStatElement = (selector, value) => {
-    const el = document.querySelector(selector);
-    if (el) el.textContent = value;
-  };
+  const totalEl = document.querySelector('.stats-grid .card:nth-child(1) div:nth-child(2)');
+  const pendingEl = document.querySelector('.stats-grid .card:nth-child(2) div:nth-child(2)');
+  const completedEl = document.querySelector('.stats-grid .card:nth-child(3) div:nth-child(2)');
+  const revenueEl = document.querySelector('.stats-grid .card:nth-child(4) div:nth-child(2)');
 
-  updateStatElement('.stats-grid .card:nth-child(1) div:nth-child(2)', totalOrders);
-  updateStatElement('.stats-grid .card:nth-child(2) div:nth-child(2)', pendingOrders);
-  updateStatElement('.stats-grid .card:nth-child(3) div:nth-child(2)', completedOrders);
-  updateStatElement('.stats-grid .card:nth-child(4) div:nth-child(2)', `৳${revenue}`);
-}
-
-function getStatusClass(status) {
-  switch(status) {
-    case 'Order Confirmed': return 'status-confirmed';
-    case 'Printing Your Order': return 'status-printing';
-    case 'Your Order Has Been Printed': return 'status-printed';
-    case 'Ready for Shipping': return 'status-shipping';
-    case 'Shipped': return 'status-shipped';
-    case 'Delivered': return 'status-delivered';
-    default: return '';
-  }
+  if (totalEl) totalEl.textContent = totalOrders;
+  if (pendingEl) pendingEl.textContent = pendingOrders;
+  if (completedEl) completedEl.textContent = completedOrders;
+  if (revenueEl) revenueEl.textContent = `৳${revenue}`;
 }

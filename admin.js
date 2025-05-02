@@ -1,7 +1,8 @@
 import { db, auth } from './firebase-config.js';
 import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { collection, addDoc, getDocs, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { collection, addDoc, getDocs, updateDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
+// DOM Elements
 const loginBtn = document.getElementById('loginBtn');
 const addOrderBtn = document.getElementById('addOrderBtn');
 const loginForm = document.getElementById('loginForm');
@@ -9,12 +10,31 @@ const adminPanel = document.getElementById('adminPanel');
 const orderList = document.getElementById('orderList');
 const addNewOrderTab = document.getElementById('addNewOrderTab');
 const allOrdersTab = document.getElementById('allOrdersTab');
-const sectionTitle = document.getElementById('sectionTitle');
-const addOrderSection = document.getElementById('addOrderSection');
-const orderListSection = document.getElementById('orderListSection');
+const dashboardTab = document.getElementById('dashboardTab');
 const searchInput = document.getElementById('searchInput');
 
-loginBtn.addEventListener('click', async () => {
+// Initialize the app
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if user is already logged in
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            loginForm.classList.add('hidden');
+            adminPanel.classList.remove('hidden');
+            loadOrders();
+            showDashboard();
+        }
+    });
+
+    // Event Listeners
+    if (loginBtn) loginBtn.addEventListener('click', handleLogin);
+    if (addOrderBtn) addOrderBtn.addEventListener('click', addOrder);
+    if (addNewOrderTab) addNewOrderTab.addEventListener('click', showAddOrder);
+    if (allOrdersTab) allOrdersTab.addEventListener('click', showAllOrders);
+    if (dashboardTab) dashboardTab.addEventListener('click', showDashboard);
+    if (searchInput) searchInput.addEventListener('input', filterOrders);
+});
+
+async function handleLogin() {
     const email = document.getElementById('adminEmail').value.trim();
     const password = document.getElementById('adminPassword').value.trim();
 
@@ -27,29 +47,30 @@ loginBtn.addEventListener('click', async () => {
         await signInWithEmailAndPassword(auth, email, password);
         loginForm.classList.add('hidden');
         adminPanel.classList.remove('hidden');
-        sectionTitle.innerText = 'Admin Panel';
-        showAddOrder();
         loadOrders();
+        showDashboard();
     } catch (error) {
         alert("Login Failed: " + error.message);
     }
-});
+}
 
-addOrderBtn.addEventListener('click', async () => {
+async function addOrder() {
     const orderData = {
         name: document.getElementById('name').value.trim(),
         address: document.getElementById('address').value.trim(),
         phone: document.getElementById('phone').value.trim(),
         drive_link: document.getElementById('driveLink').value.trim(),
-        total_price: parseInt(document.getElementById('totalPrice').value),
+        total_price: parseInt(document.getElementById('totalPrice').value) || 0,
         delivery_system: document.getElementById('deliverySystem').value,
-        delivery_charge: parseInt(document.getElementById('deliveryCharge').value),
+        delivery_charge: parseInt(document.getElementById('deliveryCharge').value) || 0,
         status: document.getElementById('status').value,
-        order_id: generateOrderID()
+        order_id: generateOrderID(),
+        created_at: new Date().toISOString()
     };
 
-    if (!orderData.name || !orderData.address || !orderData.phone || !orderData.drive_link || isNaN(orderData.total_price) || isNaN(orderData.delivery_charge) || !orderData.status) {
-        alert("Please fill in all fields correctly!");
+    // Validation
+    if (!orderData.name || !orderData.address || !orderData.phone || !orderData.drive_link) {
+        alert("Please fill in all required fields!");
         return;
     }
 
@@ -61,7 +82,7 @@ addOrderBtn.addEventListener('click', async () => {
     } catch (error) {
         alert("Failed to add order: " + error.message);
     }
-});
+}
 
 function generateOrderID() {
     const timestamp = Date.now().toString().slice(-5);
@@ -80,107 +101,192 @@ function clearOrderForm() {
     document.getElementById('status').selectedIndex = 0;
 }
 
-addNewOrderTab.addEventListener('click', showAddOrder);
-allOrdersTab.addEventListener('click', showAllOrders);
+function showDashboard() {
+    document.querySelectorAll('.content-area > div').forEach(div => div.classList.add('hidden'));
+    document.getElementById('dashboardSection').classList.remove('hidden');
+    updateActiveNav('dashboardTab');
+}
 
 function showAddOrder() {
-    sectionTitle.innerText = 'Add New Order';
-    addOrderSection.classList.remove('hidden');
-    orderListSection.classList.add('hidden');
+    document.querySelectorAll('.content-area > div').forEach(div => div.classList.add('hidden'));
+    document.getElementById('addOrderSection').classList.remove('hidden');
+    updateActiveNav('addNewOrderTab');
 }
 
 function showAllOrders() {
-    sectionTitle.innerText = 'All Orders';
-    addOrderSection.classList.add('hidden');
-    orderListSection.classList.remove('hidden');
+    document.querySelectorAll('.content-area > div').forEach(div => div.classList.add('hidden'));
+    document.getElementById('orderListSection').classList.remove('hidden');
+    updateActiveNav('allOrdersTab');
     loadOrders();
+}
+
+function updateActiveNav(activeId) {
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    document.getElementById(activeId).classList.add('active');
 }
 
 async function loadOrders() {
-    const ordersRef = collection(db, "orders");
-    const querySnapshot = await getDocs(ordersRef);
-    window.ordersData = [];
+    try {
+        const ordersRef = collection(db, "orders");
+        const q = query(ordersRef, orderBy("created_at", "desc"));
+        const querySnapshot = await getDocs(q);
+        
+        window.ordersData = [];
+        querySnapshot.forEach((docSnap) => {
+            window.ordersData.push({ id: docSnap.id, ...docSnap.data() });
+        });
 
-    querySnapshot.forEach((docSnap) => {
-        window.ordersData.push({ id: docSnap.id, ...docSnap.data() });
-    });
-
-    displayOrders(window.ordersData);
+        displayOrders(window.ordersData);
+        updateStats();
+    } catch (error) {
+        console.error("Error loading orders: ", error);
+        alert("Failed to load orders: " + error.message);
+    }
 }
 
 function displayOrders(orders) {
-    orderList.innerHTML = "";
-    orders.forEach(order => {
-        const li = document.createElement('li');
-        li.innerHTML = `
-            <strong>Order ID:</strong> ${order.order_id}<br>
-            <strong>Name:</strong> <span class="name">${order.name}</span><br>
-            <strong>Phone:</strong> <span class="phone">${order.phone}</span><br>
-            <strong>Address:</strong> <span class="address">${order.address}</span><br>
-            <strong>Drive Link:</strong> <span class="drive_link">${order.drive_link}</span><br>
-            <strong>Total Price:</strong> <span class="total_price">${order.total_price}</span><br>
-            <strong>Delivery System:</strong> <span class="delivery_system">${order.delivery_system}</span><br>
-            <strong>Delivery Charge:</strong> <span class="delivery_charge">${order.delivery_charge}</span><br>
-            <strong>Status:</strong> 
-            <select class="status">
-                <option ${order.status === "Order Confirmed" ? "selected" : ""}>Order Confirmed</option>
-                <option ${order.status === "Printing Your Order" ? "selected" : ""}>Printing Your Order</option>
-                <option ${order.status === "Your Order Has Been Printed" ? "selected" : ""}>Your Order Has Been Printed</option>
-                <option ${order.status === "Ready for Shipping" ? "selected" : ""}>Ready for Shipping</option>
-                <option ${order.status === "Shipped" ? "selected" : ""}>Shipped</option>
-                <option ${order.status === "Delivered" ? "selected" : ""}>Delivered</option>
-            </select><br>
+    if (!orderList) return;
+    
+    orderList.innerHTML = orders.map(order => `
+        <div class="order-card" data-id="${order.id}">
+            <div class="order-header">
+                <div class="order-id">${order.order_id}</div>
+                <div class="order-status ${getStatusClass(order.status)}">${order.status}</div>
+            </div>
+            <div class="order-details">
+                <div class="detail-row">
+                    <span class="detail-label">Customer:</span>
+                    <span class="detail-value editable" data-field="name">${order.name}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Phone:</span>
+                    <span class="detail-value editable" data-field="phone">${order.phone}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Address:</span>
+                    <span class="detail-value editable" data-field="address">${order.address}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Drive Link:</span>
+                    <span class="detail-value editable" data-field="drive_link">
+                        <a href="${order.drive_link}" target="_blank">View Files</a>
+                    </span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Total:</span>
+                    <span class="detail-value">৳${order.total_price + order.delivery_charge}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Delivery:</span>
+                    <span class="detail-value">${order.delivery_system} (৳${order.delivery_charge})</span>
+                </div>
+            </div>
+            <div class="order-actions">
+                <button class="btn btn-outline edit-btn">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn btn-danger delete-btn">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    `).join('');
 
-            <button class="edit-button" onclick="enableEditing('${order.id}', this)">Edit</button>
-        `;
-        orderList.appendChild(li);
+    // Add event listeners to all edit buttons
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const orderCard = this.closest('.order-card');
+            enableEditing(orderCard);
+        });
     });
 }
 
-window.enableEditing = function (docId, button) {
-    const li = button.parentElement;
-    const spans = li.querySelectorAll('span');
-    spans.forEach(span => {
-        const input = document.createElement('input');
-        input.value = span.textContent;
-        span.replaceWith(input);
-    });
-
-    const statusSelect = li.querySelector('.status');
-    statusSelect.disabled = false;
-
-    button.textContent = 'Save';
-    button.classList.remove('edit-button');
-    button.classList.add('save-button');
-    button.onclick = () => saveChanges(docId, li);
-};
-
-async function saveChanges(docId, li) {
-    const inputs = li.querySelectorAll('input');
-    const status = li.querySelector('.status').value;
-
-    const updatedData = {
-        name: inputs[0].value,
-        phone: inputs[1].value,
-        address: inputs[2].value,
-        drive_link: inputs[3].value,
-        total_price: parseInt(inputs[4].value),
-        delivery_system: inputs[5].value,
-        delivery_charge: parseInt(inputs[6].value),
-        status: status
-    };
-
-    const orderRef = doc(db, "orders", docId);
-    await updateDoc(orderRef, updatedData);
-    alert('Order Updated!');
-    loadOrders();
+function getStatusClass(status) {
+    switch(status) {
+        case 'Order Confirmed': return 'status-confirmed';
+        case 'Printing Your Order': return 'status-printing';
+        case 'Your Order Has Been Printed': return 'status-printed';
+        case 'Ready for Shipping': return 'status-shipping';
+        case 'Shipped': return 'status-shipped';
+        case 'Delivered': return 'status-delivered';
+        default: return '';
+    }
 }
 
-searchInput.addEventListener('input', () => {
+function enableEditing(orderCard) {
+    const orderId = orderCard.dataset.id;
+    const editBtn = orderCard.querySelector('.edit-btn');
+    
+    if (editBtn.innerHTML.includes('Save')) {
+        // Already in edit mode, save changes
+        saveChanges(orderId, orderCard);
+        editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
+    } else {
+        // Enter edit mode
+        orderCard.querySelectorAll('.editable').forEach(el => {
+            const field = el.dataset.field;
+            const value = el.textContent || el.querySelector('a')?.href || '';
+            
+            if (field === 'drive_link') {
+                el.innerHTML = `<input type="text" class="form-control" value="${value}" data-field="${field}">`;
+            } else {
+                el.innerHTML = `<input type="text" class="form-control" value="${value}" data-field="${field}">`;
+            }
+        });
+        
+        editBtn.innerHTML = '<i class="fas fa-save"></i> Save';
+    }
+}
+
+async function saveChanges(orderId, orderCard) {
+    const inputs = orderCard.querySelectorAll('input[data-field]');
+    const updatedData = {};
+
+    inputs.forEach(input => {
+        updatedData[input.dataset.field] = input.value;
+    });
+
+    try {
+        const orderRef = doc(db, "orders", orderId);
+        await updateDoc(orderRef, updatedData);
+        loadOrders();
+    } catch (error) {
+        alert("Failed to update order: " + error.message);
+    }
+}
+
+function filterOrders() {
     const keyword = searchInput.value.toLowerCase();
     const filtered = window.ordersData.filter(order =>
         order.name.toLowerCase().includes(keyword) ||
-        order.phone.toLowerCase().includes(keyword)
+        order.phone.toLowerCase().includes(keyword) ||
+        order.order_id.toLowerCase().includes(keyword)
     );
     displayOrders(filtered);
-});
+}
+
+function updateStats() {
+    if (!window.ordersData) return;
+    
+    const totalOrders = window.ordersData.length;
+    const pendingOrders = window.ordersData.filter(order => 
+        order.status !== 'Delivered'
+    ).length;
+    const completedOrders = window.ordersData.filter(order => 
+        order.status === 'Delivered'
+    ).length;
+    const revenue = window.ordersData.reduce((sum, order) => 
+        sum + order.total_price + order.delivery_charge, 0
+    );
+
+    // Update stats cards if they exist
+    const totalEl = document.querySelector('.stats-grid .card:nth-child(1) div:nth-child(2)');
+    const pendingEl = document.querySelector('.stats-grid .card:nth-child(2) div:nth-child(2)');
+    const completedEl = document.querySelector('.stats-grid .card:nth-child(3) div:nth-child(2)');
+    const revenueEl = document.querySelector('.stats-grid .card:nth-child(4) div:nth-child(2)');
+    
+    if (totalEl) totalEl.textContent = totalOrders;
+    if (pendingEl) pendingEl.textContent = pendingOrders;
+    if (completedEl) completedEl.textContent = completedOrders;
+    if (revenueEl) revenueEl.textContent = `৳${revenue}`;
+}

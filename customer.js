@@ -19,38 +19,33 @@ const statusClasses = {
     'Delivered': 'status-delivered'
 };
 
-// Format phone number input
+// Phone number formatting function
 const formatPhoneInput = (value) => {
-    let numbers = value.replace(/\D/g, '');
-    numbers = numbers.substring(0, 11);
-    
-    if (numbers.startsWith('01')) {
-        if (numbers.length > 5) {
-            numbers = `${numbers.substring(0, 5)}-${numbers.substring(5)}`;
-        }
-        return numbers.substring(0, 11);
+    let numbers = value.replace(/\D/g, '').substring(0, 11);
+    if (numbers.startsWith('01') && numbers.length > 5) {
+        return `${numbers.substring(0, 5)}-${numbers.substring(5)}`;
     }
     return numbers;
 };
 
-// Validate Bangladeshi phone number
+// Phone number validation
 const validatePhoneNumber = (phone) => {
     const cleaned = phone.replace(/\D/g, '');
-    return /^01\d{9}$/.test(cleaned);
+    return cleaned.length === 11 && cleaned.startsWith('01');
 };
 
-// Validate Order ID format
+// Order ID validation
 const validateOrderId = (orderId) => {
     return /^ORD\d+$/i.test(orderId);
 };
 
-// Show/hide loading state
+// Loading state management
 const showLoading = (isLoading) => {
     loading.classList.toggle('hidden', !isLoading);
     trackBtn.disabled = isLoading;
 };
 
-// Show error messages
+// Error message handling
 const showError = (message) => {
     errorMessage.textContent = message;
     errorMessage.classList.remove('hidden');
@@ -74,8 +69,8 @@ const createOrderCard = (orderData) => {
             <span class="detail-value">${orderData.name}</span>
         </div>
         <div class="detail-item">
-            <span class="detail-label">Phone Number:</span>
-            <span class="detail-value">${orderData.phone}</span>
+            <span class="detail-label">Phone:</span>
+            <span class="detail-value">${orderData.phone.replace(/(\d{5})(\d{6})/, '$1-$2')}</span>
         </div>
         <div class="detail-item">
             <span class="detail-label">Documents:</span>
@@ -90,7 +85,7 @@ const createOrderCard = (orderData) => {
             <span class="detail-value">৳${orderData.total_price + orderData.delivery_charge}</span>
         </div>
         <div class="detail-item">
-            <span class="detail-label">Status Updated:</span>
+            <span class="detail-label">Last Updated:</span>
             <span class="detail-value">
                 ${new Date(orderData.created_at).toLocaleDateString('en-GB', {
                     day: 'numeric',
@@ -103,26 +98,22 @@ const createOrderCard = (orderData) => {
     return card;
 };
 
-// Handle search type changes
+// Search type change handler
 searchType.addEventListener('change', () => {
     searchInput.value = '';
-    searchInput.placeholder = searchType.value === 'phone' 
-        ? '01XXXXXXXXX' 
-        : 'ORDXXXXXXX';
-        
     if (searchType.value === 'phone') {
-        searchInput.type = 'tel';
-        searchInput.pattern = '01\\d{9}';
+        searchInput.placeholder = '01969312826';
+        searchInput.maxLength = 11;
     } else {
-        searchInput.type = 'text';
-        searchInput.pattern = 'ORD\\d+';
+        searchInput.placeholder = 'ORD123456';
+        searchInput.maxLength = 20;
     }
 });
 
-// Handle phone number input formatting
-searchInput.addEventListener('input', () => {
+// Phone number input formatting
+searchInput.addEventListener('input', function(e) {
     if (searchType.value === 'phone') {
-        searchInput.value = formatPhoneInput(searchInput.value);
+        e.target.value = formatPhoneInput(e.target.value);
     }
 });
 
@@ -135,21 +126,20 @@ trackBtn.addEventListener('click', async () => {
         const searchValue = searchInput.value.trim();
         const currentSearchType = searchType.value;
 
-        // Validate input
         if (!searchValue) {
             showError('Please enter a search value');
             return;
         }
 
-        // Build Firestore query
         let field, value;
         if (currentSearchType === 'phone') {
-            if (!validatePhoneNumber(searchValue)) {
-                showError('Invalid phone number format (01XXXXXXXXX)');
+            const cleanedPhone = searchValue.replace(/\D/g, '');
+            if (!validatePhoneNumber(cleanedPhone)) {
+                showError('Invalid phone number (must be 11 digits starting with 01)');
                 return;
             }
             field = 'phone';
-            value = searchValue.replace(/\D/g, '');
+            value = cleanedPhone;
         } else {
             if (!validateOrderId(searchValue)) {
                 showError('Invalid Order ID (must start with ORD)');
@@ -159,18 +149,15 @@ trackBtn.addEventListener('click', async () => {
             value = searchValue.toUpperCase();
         }
 
-        // Execute query
         const ordersRef = collection(db, 'orders');
         const q = query(ordersRef, where(field, '==', value));
         const querySnapshot = await getDocs(q);
 
-        // Handle results
         if (querySnapshot.empty) {
             showError('No orders found');
             return;
         }
 
-        // Display results
         ordersContainer.innerHTML = '';
         querySnapshot.forEach(doc => {
             const orderData = doc.data();

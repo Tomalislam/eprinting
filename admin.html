@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Panel</title>
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="admin.js"></script>
+</head>
+<body>
+    <h1>Admin Login</h1>
+    <input type="email" id="adminEmail" placeholder="Email">
+    <input type="password" id="adminPassword" placeholder="Password">
+    <button id="loginBtn">Login</button>
+
+    <div id="adminPanel" style="display:none;">
+        <h2>Add New Order</h2>
+        <input type="text" id="name" placeholder="Customer Name"><br>
+        <input type="text" id="address" placeholder="Address"><br>
+        <input type="text" id="phone" placeholder="Phone"><br>
+        <input type="text" id="driveLink" placeholder="Drive Link"><br>
+        <input type="number" id="totalPrice" placeholder="Total Price"><br>
+        <select id="deliverySystem">
+            <option value="Sundorbon Delivery">Sundorbon Delivery</option>
+            <option value="Home Delivery">Home Delivery</option>
+        </select><br>
+        <input type="number" id="deliveryCharge" placeholder="Delivery Charge"><br>
+        <select id="status">
+            <option value="Order Confirmed">Order Confirmed</option>
+            <option value="Printing Your Order">Printing Your Order</option>
+            <option value="Your Order Has Been Printed">Your Order Has Been Printed</option>
+            <option value="Ready for Shipping">Ready for Shipping</option>
+            <option value="Shipped">Shipped</option>
+            <option value="Delivered">Delivered</option>
+        </select><br>
+        <button id="addOrderBtn">Add Order</button>
+
+        <h2>All Orders</h2>
+        <ul id="orderList"></ul>
+    </div>
+</body>
+</html>

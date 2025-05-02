@@ -2,40 +2,158 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Panel</title>
+    <title>E Printing Service - Admin Panel</title>
     <script type="module" src="firebase-config.js"></script>
     <script type="module" src="admin.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+        body {
+            background: linear-gradient(to right, #6a11cb, #2575fc);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            color: #fff;
+        }
+        .website-name {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            background: linear-gradient(to right, #00f2fe, #4facfe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+            animation: slideDown 1s ease forwards;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .container {
+            background: #1e1e2f;
+            padding: 30px;
+            border-radius: 15px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            animation: fadeIn 1s ease forwards;
+        }
+        @keyframes fadeIn {
+            from {opacity: 0; transform: translateY(-20px);}
+            to {opacity: 1; transform: translateY(0);}
+        }
+        h1, h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px 15px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 8px;
+            background: #2e2e42;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            transition: background 0.3s;
+        }
+        input:focus, select:focus {
+            background: #3e3e5e;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 8px;
+            background: #4facfe;
+            background: linear-gradient(to right, #00f2fe, #4facfe);
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.4s;
+        }
+        button:hover {
+            background: linear-gradient(to right, #43e97b, #38f9d7);
+        }
+        #orderList {
+            list-style: none;
+            margin-top: 20px;
+            padding-left: 0;
+        }
+        #orderList li {
+            background: #2e2e42;
+            margin-bottom: 10px;
+            padding: 15px;
+            border-radius: 10px;
+            animation: fadeInUp 0.5s ease forwards;
+        }
+        @keyframes fadeInUp {
+            from {opacity: 0; transform: translateY(10px);}
+            to {opacity: 1; transform: translateY(0);}
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
 </head>
 <body>
-    <h1>Admin Login</h1>
-    <input type="email" id="adminEmail" placeholder="Email">
-    <input type="password" id="adminPassword" placeholder="Password">
-    <button id="loginBtn">Login</button>
+    <div class="website-name">E Printing Service</div>
 
-    <div id="adminPanel" style="display:none;">
-        <h2>Add New Order</h2>
-        <input type="text" id="name" placeholder="Customer Name"><br>
-        <input type="text" id="address" placeholder="Address"><br>
-        <input type="text" id="phone" placeholder="Phone"><br>
-        <input type="text" id="driveLink" placeholder="Drive Link"><br>
-        <input type="number" id="totalPrice" placeholder="Total Price"><br>
-        <select id="deliverySystem">
-            <option value="Sundorbon Delivery">Sundorbon Delivery</option>
-            <option value="Home Delivery">Home Delivery</option>
-        </select><br>
-        <input type="number" id="deliveryCharge" placeholder="Delivery Charge"><br>
-        <select id="status">
-            <option value="Order Confirmed">Order Confirmed</option>
-            <option value="Printing Your Order">Printing Your Order</option>
-            <option value="Your Order Has Been Printed">Your Order Has Been Printed</option>
-            <option value="Ready for Shipping">Ready for Shipping</option>
-            <option value="Shipped">Shipped</option>
-            <option value="Delivered">Delivered</option>
-        </select><br>
-        <button id="addOrderBtn">Add Order</button>
+    <div class="container">
+        <h1>Admin Login</h1>
+        <div id="loginForm">
+            <input type="email" id="adminEmail" placeholder="Email">
+            <input type="password" id="adminPassword" placeholder="Password">
+            <button id="loginBtn">Login</button>
+        </div>
 
-        <h2>All Orders</h2>
-        <ul id="orderList"></ul>
+        <div id="adminPanel" class="hidden">
+            <h2>Add New Order</h2>
+            <input type="text" id="name" placeholder="Customer Name">
+            <input type="text" id="address" placeholder="Address">
+            <input type="text" id="phone" placeholder="Phone">
+            <input type="text" id="driveLink" placeholder="Drive Link">
+            <input type="number" id="totalPrice" placeholder="Total Price">
+            <select id="deliverySystem">
+                <option value="" disabled selected>Choose Delivery System</option>
+                <option value="Sundorbon Delivery">Sundorbon Delivery</option>
+                <option value="Home Delivery">Home Delivery</option>
+            </select>
+            <input type="number" id="deliveryCharge" placeholder="Delivery Charge">
+            <select id="status">
+                <option value="" disabled selected>Choose Order Status</option>
+                <option value="Order Confirmed">Order Confirmed</option>
+                <option value="Printing Your Order">Printing Your Order</option>
+                <option value="Your Order Has Been Printed">Your Order Has Been Printed</option>
+                <option value="Ready for Shipping">Ready for Shipping</option>
+                <option value="Shipped">Shipped</option>
+                <option value="Delivered">Delivered</option>
+            </select>
+            <button id="addOrderBtn">Add Order</button>
+
+            <h2>All Orders</h2>
+            <ul id="orderList"></ul>
+        </div>
     </div>
+
+    <script>
+        // Small script to dynamically show/hide login and panel
+        document.getElementById('loginBtn').addEventListener('click', function() {
+            // Normally you validate here
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('adminPanel').classList.remove('hidden');
+        });
+    </script>
 </body>
 </html>

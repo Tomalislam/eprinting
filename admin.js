@@ -9,12 +9,12 @@ import Chart from 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm';
 
 // Firebase Configuration
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+apiKey: "AIzaSyD2oTeRHgWwA2RvBVQZWcBhi3UNw9l3w2Y",
+    authDomain: "e-printing-3ca34.firebaseapp.com",
+    projectId: "e-printing-3ca34",
+    messagingSenderId: "51071340726",
+    appId: "1:51071340726:web:aa1a604db26a3c9d9a1617",
+    measurementId: "G-G0LSVYTBHJ"
 };
 
 // Initialize Firebase

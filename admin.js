@@ -1,91 +1,61 @@
-import { db, auth } from './firebase-config.js';
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { 
-    signInWithEmailAndPassword, 
-    signOut 
-} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { 
-    collection, 
-    addDoc, 
-    getDocs, 
-    updateDoc, 
-    doc, 
-    query, 
-    orderBy, 
-    deleteDoc 
+    getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { 
+    getAuth, signInWithEmailAndPassword, signOut 
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import Chart from 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm';
 
-// ======================
-// Global Variables
-// ======================
-let orders = [];
-let costs = [];
-const statusClasses = {
-    'Order Confirmed': 'status-confirmed',
-    'Printing Your Order': 'status-printing',
-    'Printed - Awaiting Payment': 'status-printed',
-    'Your Order Has Been Printed': 'status-printed',
-    'Ready for Shipping': 'status-shipping',
-    'Shipped': 'status-shipped',
-    'Delivered': 'status-delivered'
+// Firebase Configuration
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
 };
 
-// ======================
-// DOM Elements
-// ======================
-let orderList, recentOrders, searchInput, costsList;
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
-// ======================
-// Initialization
-// ======================
+// Global Variables
+let currentUser = null;
+let orders = [];
+let costs = [];
+let settings = {};
+let revenueChart = null;
+
 document.addEventListener('DOMContentLoaded', () => {
-    initializeDOMElements();
+    initAuth();
     setupEventListeners();
-    auth.onAuthStateChanged(handleAuthState);
 });
 
-function initializeDOMElements() {
-    orderList = document.getElementById('orderList');
-    recentOrders = document.getElementById('recentOrders');
-    searchInput = document.getElementById('searchOrders');
-    costsList = document.getElementById('costsList');
+// Authentication Functions
+function initAuth() {
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = user;
+            loadAllData();
+            showAdminPanel();
+        } else {
+            showLoginForm();
+        }
+    });
 }
 
-function setupEventListeners() {
-    // Menu Navigation
-    document.getElementById('dashboardTab').addEventListener('click', () => showSection('dashboardSection'));
-    document.getElementById('addNewOrderTab').addEventListener('click', () => showSection('addOrderSection'));
-    document.getElementById('allOrdersTab').addEventListener('click', () => showSection('orderListSection'));
-    document.getElementById('costsTab').addEventListener('click', () => showSection('costsSection'));
-    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
-    
-    // Order Management
-    document.getElementById('addOrderBtn').addEventListener('click', handleAddOrder);
-    document.getElementById('viewAllOrders').addEventListener('click', () => showSection('orderListSection'));
-    searchInput.addEventListener('input', filterOrders);
-    
-    // Cost Management
-    document.getElementById('addCostBtn').addEventListener('click', handleAddCost);
-    
-    // Status Updates
-    document.addEventListener('change', handleStatusChange);
-    
-    // Login Form
-    document.getElementById('loginFormElement').addEventListener('submit', handleLogin);
-}
-
-// ======================
-// Authentication
-// ======================
 async function handleLogin(e) {
     e.preventDefault();
-    const email = document.getElementById('adminEmail').value.trim();
-    const password = document.getElementById('adminPassword').value.trim();
+    const email = document.getElementById('adminEmail').value;
+    const password = document.getElementById('adminPassword').value;
 
     try {
         await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
         showError(`Login failed: ${error.message}`);
-        document.getElementById('adminPassword').value = '';
     }
 }
 
@@ -97,342 +67,320 @@ async function handleLogout() {
     }
 }
 
-function handleAuthState(user) {
-    if (user) {
-        showAdminPanel();
-        loadInitialData();
-    } else {
-        showLoginForm();
-    }
-}
-
-// ======================
-// Order Management
-// ======================
-async function loadOrders() {
+// Data Loading Functions
+async function loadAllData() {
     try {
-        const ordersRef = collection(db, "orders");
-        const q = query(ordersRef, orderBy("created_at", "desc"));
-        const snapshot = await getDocs(q);
-        
-        orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        refreshOrderDisplays();
-    } catch (error) {
-        showError(`Failed to load orders: ${error.message}`);
-    }
-}
-
-function refreshOrderDisplays() {
-    // Update All Orders
-    if (orderList) orderList.innerHTML = orders.map(createOrderCard).join('');
-    
-    // Update Recent Orders (Pending)
-    const pendingOrders = orders.filter(o => o.status !== 'Delivered').slice(0, 5);
-    if (recentOrders) recentOrders.innerHTML = pendingOrders.map(createOrderCard).join('');
-    
-    updateDashboard();
-}
-
-function createOrderCard(order) {
-    return `
-        <div class="order-card" data-id="${order.id}">
-            <div class="order-header">
-                <div class="order-id">${order.order_id}</div>
-                <select class="status-select ${statusClasses[order.status]}">
-                    ${Object.keys(statusClasses)
-                        .map(status => `
-                            <option value="${status}" ${status === order.status ? 'selected' : ''}>
-                                ${status}
-                            </option>`)
-                        .join('')}
-                </select>
-            </div>
-            <div class="order-details">
-                <div class="detail-row">
-                    <span class="detail-label">Customer:</span>
-                    <span class="detail-value">${order.name}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Phone:</span>
-                    <span class="detail-value">${formatPhone(order.phone)}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Documents:</span>
-                    <span class="detail-value">
-                        <a href="${order.drive_link}" target="_blank" class="drive-link">
-                            <i class="fas fa-external-link-alt"></i> View Files
-                        </a>
-                    </span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Total:</span>
-                    <span class="detail-value">৳${order.total_price + order.delivery_charge}</span>
-                </div>
-                ${order.due_amount > 0 ? `
-                    <div class="detail-row warning">
-                        <span class="detail-label">Due Amount:</span>
-                        <span class="detail-value">৳${order.due_amount}</span>
-                    </div>
-                ` : ''}
-            </div>
-            <div class="order-actions">
-                <button class="btn btn-danger delete-btn">
-                    <i class="fas fa-trash"></i> Delete
-                </button>
-            </div>
-        </div>
-    `;
-}
-
-// ======================
-// Cost Management
-// ======================
-async function loadCosts() {
-    try {
-        const costsRef = collection(db, "costs");
-        const q = query(costsRef, orderBy("date", "desc"));
-        const snapshot = await getDocs(q);
-        
-        costs = snapshot.docs.map(doc => doc.data());
-        refreshCostsDisplay();
+        await Promise.all([
+            loadOrders(),
+            loadCosts(),
+            loadSettings()
+        ]);
         updateDashboard();
+        initCharts();
     } catch (error) {
-        showError(`Failed to load costs: ${error.message}`);
+        showError(`Data loading failed: ${error.message}`);
     }
 }
 
-function refreshCostsDisplay() {
-    if (costsList) {
-        costsList.innerHTML = costs.map(cost => `
-            <div class="cost-item">
-                <div class="cost-header">
-                    <span>৳${cost.amount}</span>
-                    <span>${new Date(cost.date).toLocaleDateString()}</span>
-                </div>
-                <div class="cost-details">
-                    <div><strong>${cost.category}</strong></div>
-                    <div>${cost.description || ''}</div>
-                </div>
-            </div>
-        `).join('');
-    }
+async function loadOrders() {
+    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+    orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    renderOrderList();
 }
 
-// ======================
+async function loadCosts() {
+    const q = query(collection(db, "costs"), orderBy("date", "desc"));
+    const snapshot = await getDocs(q);
+    costs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+async function loadSettings() {
+    const docRef = doc(db, "settings", "company");
+    const docSnap = await getDoc(docRef);
+    settings = docSnap.exists() ? docSnap.data() : {};
+    renderSettingsForm();
+}
+
 // Dashboard Functions
-// ======================
 function updateDashboard() {
+    // Calculate metrics
     const totalOrders = orders.length;
     const pendingOrders = orders.filter(o => o.status !== 'Delivered').length;
     const completedOrders = orders.filter(o => o.status === 'Delivered').length;
-    const revenue = orders.reduce((sum, o) => sum + o.total_price, 0);
+    const revenue = orders.reduce((sum, o) => sum + o.totalPrice + o.deliveryCharge, 0);
     const totalCosts = costs.reduce((sum, c) => sum + c.amount, 0);
-    const deliveryCosts = orders.reduce((sum, o) => sum + o.delivery_charge, 0);
-    const netProfit = revenue - totalCosts - deliveryCosts;
+    const netProfit = revenue - totalCosts;
 
-    // Update Dashboard Metrics
+    // Update DOM
     setDashboardValue('totalOrdersValue', totalOrders);
     setDashboardValue('pendingOrdersValue', pendingOrders);
     setDashboardValue('completedOrdersValue', completedOrders);
-    setDashboardValue('netProfitValue', netProfit);
-    setDashboardValue('revenueValue', revenue);
+    setDashboardValue('totalRevenueValue', revenue);
     setDashboardValue('totalCostsValue', totalCosts);
-    setDashboardValue('deliveryCostsValue', deliveryCosts);
+    setDashboardValue('netProfitValue', netProfit);
 }
 
-// ======================
-// Event Handlers
-// ======================
+// Order Management Functions
 async function handleAddOrder() {
     const orderData = {
-        name: getValue('name'),
-        address: getValue('address'),
-        phone: getValue('phone').replace(/\D/g, ''),
-        drive_link: getValue('driveLink'),
-        total_price: Number(getValue('totalPrice')) || 0,
-        delivery_system: 'Home Delivery',
-        delivery_charge: Number(getValue('deliveryCharge')) || 0,
-        due_amount: Number(getValue('dueAmount')) || 0,
-        status: 'Order Confirmed',
-        order_id: generateOrderID(),
-        created_at: new Date().toISOString()
+        customerName: document.getElementById('customerName').value,
+        phone: document.getElementById('phone').value,
+        address: document.getElementById('address').value,
+        driveLink: document.getElementById('driveLink').value,
+        totalPrice: Number(document.getElementById('totalPrice').value),
+        deliveryCharge: Number(document.getElementById('deliveryCharge').value),
+        deliverySystem: document.getElementById('deliverySystem').value,
+        status: 'Pending',
+        createdAt: serverTimestamp()
     };
-
-    if (!validateOrder(orderData)) return;
 
     try {
         await addDoc(collection(db, "orders"), orderData);
-        clearOrderForm();
         loadOrders();
-        showSection('orderListSection');
+        showSection('ordersSection');
     } catch (error) {
         showError(`Failed to add order: ${error.message}`);
     }
 }
 
-async function handleAddCost() {
-    const costData = {
-        amount: Number(getValue('costAmount')) || 0,
-        category: getValue('costCategory'),
-        description: getValue('costDescription'),
-        date: new Date().toISOString()
+async function handleEditOrder(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    const form = document.getElementById('editOrderForm');
+    
+    // Populate form
+    form.elements['customerName'].value = order.customerName;
+    form.elements['status'].value = order.status;
+    
+    // Show modal
+    document.getElementById('editOrderModal').classList.add('show');
+    
+    // Handle form submission
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+            await updateDoc(doc(db, "orders", orderId), {
+                status: form.elements['status'].value,
+                customerName: form.elements['customerName'].value
+            });
+            loadOrders();
+            closeModal();
+        } catch (error) {
+            showError(`Update failed: ${error.message}`);
+        }
     };
-
-    if (!costData.amount || !costData.category) {
-        showError("Please fill required cost fields");
-        return;
-    }
-
-    try {
-        await addDoc(collection(db, "costs"), costData);
-        loadCosts();
-        document.getElementById('costForm').reset();
-    } catch (error) {
-        showError(`Failed to add cost: ${error.message}`);
-    }
 }
 
-async function handleStatusChange(event) {
-    if (event.target.classList.contains('status-select')) {
-        const card = event.target.closest('.order-card');
-        const orderId = card.dataset.id;
-        const newStatus = event.target.value;
-
+async function handleDeleteOrder(orderId) {
+    if (confirm('Are you sure you want to delete this order?')) {
         try {
-            await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-            orders = orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o);
-            refreshOrderDisplays();
+            await deleteDoc(doc(db, "orders", orderId));
+            loadOrders();
         } catch (error) {
-            showError(`Status update failed: ${error.message}`);
+            showError(`Delete failed: ${error.message}`);
         }
     }
 }
 
-document.addEventListener('click', async (event) => {
-    if (event.target.classList.contains('delete-btn')) {
-        const card = event.target.closest('.order-card');
-        const orderId = card.dataset.id;
-        
-        if (confirm("Are you sure you want to delete this order?")) {
-            try {
-                await deleteDoc(doc(db, "orders", orderId));
-                orders = orders.filter(o => o.id !== orderId);
-                refreshOrderDisplays();
-            } catch (error) {
-                showError(`Delete failed: ${error.message}`);
+// Analytics Functions
+function initCharts() {
+    if (revenueChart) revenueChart.destroy();
+    
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    const data = prepareChartData();
+    
+    revenueChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: 'Revenue',
+                data: data.revenue,
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Monthly Revenue Analysis'
+                }
             }
         }
-    }
-});
-
-// ======================
-// Utility Functions
-// ======================
-function showSection(sectionId) {
-    // Hide all sections
-    ['dashboardSection', 'addOrderSection', 'orderListSection', 'costsSection']
-        .forEach(id => document.getElementById(id)?.classList.add('hidden'));
-    
-    // Show requested section
-    document.getElementById(sectionId)?.classList.remove('hidden');
-    
-    // Update active menu item
-    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-    switch(sectionId) {
-        case 'dashboardSection':
-            document.getElementById('dashboardTab').classList.add('active');
-            break;
-        case 'addOrderSection':
-            document.getElementById('addNewOrderTab').classList.add('active');
-            break;
-        case 'orderListSection':
-            document.getElementById('allOrdersTab').classList.add('active');
-            break;
-        case 'costsSection':
-            document.getElementById('costsTab').classList.add('active');
-            break;
-    }
-}
-
-function filterOrders() {
-    const term = searchInput.value.toLowerCase();
-    const filtered = orders.filter(order => 
-        order.name.toLowerCase().includes(term) ||
-        order.phone.includes(term) ||
-        order.order_id.toLowerCase().includes(term)
-    );
-    orderList.innerHTML = filtered.map(createOrderCard).join('');
-}
-
-function generateOrderID() {
-    return 'ORD' + Date.now().toString().slice(-6) + Math.floor(Math.random() * 100);
-}
-
-function formatPhone(phone) {
-    return phone.replace(/(\d{4})(\d{3})(\d{4})/, '$1-$2-$3');
-}
-
-function validateOrder(order) {
-    const required = ['name', 'address', 'phone', 'drive_link'];
-    return required.every(field => {
-        if (!order[field]) {
-            showError(`Missing required field: ${field.replace('_', ' ')}`);
-            return false;
-        }
-        return true;
     });
 }
 
-// ======================
+function prepareChartData() {
+    // Group orders by month
+    const monthlyData = {};
+    orders.forEach(order => {
+        const month = new Date(order.createdAt?.toDate()).toLocaleString('default', { month: 'short' });
+        if (!monthlyData[month]) monthlyData[month] = 0;
+        monthlyData[month] += order.totalPrice + order.deliveryCharge;
+    });
+    
+    return {
+        labels: Object.keys(monthlyData),
+        revenue: Object.values(monthlyData)
+    };
+}
+
+// Settings Functions
+async function saveSettings() {
+    const settingsData = {
+        companyName: document.getElementById('companyName').value,
+        companyAddress: document.getElementById('companyAddress').value,
+        companyPhone: document.getElementById('companyPhone').value,
+        updatedAt: serverTimestamp()
+    };
+
+    try {
+        await setDoc(doc(db, "settings", "company"), settingsData);
+        showSuccess('Settings saved successfully');
+        loadSettings();
+    } catch (error) {
+        showError(`Error saving settings: ${error.message}`);
+    }
+}
+
+// Print Functions
+function printShippingLabel(order) {
+    const content = `
+        <div class="shipping-label">
+            <h2>Shipping Label</h2>
+            <div class="from-address">
+                <h3>From:</h3>
+                <p>${settings.companyName || 'Your Company'}</p>
+                <p>${settings.companyAddress || '123 Business Street'}</p>
+                <p>${settings.companyPhone || '01XXX-XXXXXX'}</p>
+            </div>
+            <div class="to-address">
+                <h3>To:</h3>
+                <p>${order.customerName}</p>
+                <p>${order.address}</p>
+                <p>${order.phone}</p>
+            </div>
+            <div class="delivery-method">
+                <strong>Delivery Method:</strong> ${order.deliverySystem}
+            </div>
+        </div>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(content);
+    printWindow.print();
+}
+
 // UI Functions
-// ======================
+function showSection(sectionId) {
+    // Hide all sections
+    document.querySelectorAll('.content-section').forEach(sec => sec.classList.add('hidden'));
+    // Show requested section
+    document.getElementById(sectionId).classList.remove('hidden');
+}
+
+function renderOrderList() {
+    const container = document.getElementById('orderList');
+    container.innerHTML = orders.map(order => `
+        <div class="order-card" data-id="${order.id}">
+            <div class="order-header">
+                <h4>${order.customerName}</h4>
+                <span class="status ${order.status.toLowerCase()}">${order.status}</span>
+            </div>
+            <div class="order-details">
+                <p>Total: ৳${order.totalPrice + order.deliveryCharge}</p>
+                <p>Delivery: ${order.deliverySystem}</p>
+                <p>Phone: ${order.phone}</p>
+            </div>
+            <div class="order-actions">
+                <button class="btn edit-btn"><i class="fas fa-edit"></i></button>
+                <button class="btn print-btn"><i class="fas fa-print"></i></button>
+                <button class="btn delete-btn"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>
+    `).join('');
+}
+
 function showAdminPanel() {
     document.getElementById('loginForm').classList.add('hidden');
     document.getElementById('adminPanel').classList.remove('hidden');
 }
 
 function showLoginForm() {
-    document.getElementById('loginForm').classList.remove('hidden');
     document.getElementById('adminPanel').classList.add('hidden');
+    document.getElementById('loginForm').classList.remove('hidden');
 }
 
-function clearOrderForm() {
-    ['name', 'address', 'phone', 'driveLink', 'totalPrice', 'deliveryCharge', 'dueAmount']
-        .forEach(id => document.getElementById(id).value = '');
+// Event Listeners
+function setupEventListeners() {
+    // Navigation
+    document.getElementById('dashboardTab').addEventListener('click', () => showSection('dashboardSection'));
+    document.getElementById('ordersTab').addEventListener('click', () => showSection('ordersSection'));
+    document.getElementById('analyticsTab').addEventListener('click', () => showSection('analyticsSection'));
+    document.getElementById('settingsTab').addEventListener('click', () => showSection('settingsSection'));
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+
+    // Order Actions
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('.edit-btn')) {
+            const orderId = e.target.closest('.order-card').dataset.id;
+            handleEditOrder(orderId);
+        }
+        if (e.target.closest('.delete-btn')) {
+            const orderId = e.target.closest('.order-card').dataset.id;
+            handleDeleteOrder(orderId);
+        }
+        if (e.target.closest('.print-btn')) {
+            const orderId = e.target.closest('.order-card').dataset.id;
+            const order = orders.find(o => o.id === orderId);
+            printShippingLabel(order);
+        }
+    });
+
+    // Forms
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
+    document.getElementById('addOrderForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        handleAddOrder();
+    });
+    document.getElementById('settingsForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveSettings();
+    });
 }
 
-function getValue(id) {
-    return document.getElementById(id)?.value.trim() || '';
-}
-
-function setDashboardValue(id, value) {
-    const element = document.getElementById(id);
-    if (element) element.textContent = typeof value === 'number' ? value.toLocaleString() : value;
-}
-
+// Utility Functions
 function showError(message) {
-    const errorDiv = document.getElementById('errorMessage') || createErrorElement();
+    const errorDiv = document.getElementById('errorMessage');
     errorDiv.textContent = message;
     errorDiv.classList.remove('hidden');
     setTimeout(() => errorDiv.classList.add('hidden'), 5000);
 }
 
-function createErrorElement() {
-    const div = document.createElement('div');
-    div.id = 'errorMessage';
-    div.className = 'error hidden';
-    document.body.appendChild(div);
-    return div;
+function showSuccess(message) {
+    const successDiv = document.getElementById('successMessage');
+    successDiv.textContent = message;
+    successDiv.classList.remove('hidden');
+    setTimeout(() => successDiv.classList.add('hidden'), 3000);
 }
 
-// ======================
-// Initial Data Loading
-// ======================
-async function loadInitialData() {
-    try {
-        await Promise.all([loadOrders(), loadCosts()]);
-        updateDashboard();
-    } catch (error) {
-        showError(`Initialization error: ${error.message}`);
+function setDashboardValue(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = typeof value === 'number' ? `৳${value.toLocaleString()}` : value;
     }
 }
+
+function closeModal() {
+    document.getElementById('editOrderModal').classList.remove('show');
+}
+
+// Initialize
+document.getElementById('editOrderModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('editOrderModal')) {
+        closeModal();
+    }
+});

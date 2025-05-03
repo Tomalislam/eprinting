@@ -15,9 +15,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // ======================
-// DOM Element References
+// Global Variables
 // ======================
-let orderList, recentOrders, searchInput, costsList;
+let orders = [];
+let costs = [];
 const statusClasses = {
     'Order Confirmed': 'status-confirmed',
     'Printing Your Order': 'status-printing',
@@ -27,6 +28,11 @@ const statusClasses = {
     'Shipped': 'status-shipped',
     'Delivered': 'status-delivered'
 };
+
+// ======================
+// DOM Elements
+// ======================
+let orderList, recentOrders, searchInput, costsList;
 
 // ======================
 // Initialization
@@ -45,13 +51,26 @@ function initializeDOMElements() {
 }
 
 function setupEventListeners() {
-    document.addEventListener('click', handleButtonClicks);
+    // Menu Navigation
+    document.getElementById('dashboardTab').addEventListener('click', () => showSection('dashboardSection'));
+    document.getElementById('addNewOrderTab').addEventListener('click', () => showSection('addOrderSection'));
+    document.getElementById('allOrdersTab').addEventListener('click', () => showSection('orderListSection'));
+    document.getElementById('costsTab').addEventListener('click', () => showSection('costsSection'));
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    
+    // Order Management
+    document.getElementById('addOrderBtn').addEventListener('click', handleAddOrder);
+    document.getElementById('viewAllOrders').addEventListener('click', () => showSection('orderListSection'));
+    searchInput.addEventListener('input', filterOrders);
+    
+    // Cost Management
+    document.getElementById('addCostBtn').addEventListener('click', handleAddCost);
+    
+    // Status Updates
     document.addEventListener('change', handleStatusChange);
-    searchInput?.addEventListener('input', filterOrders);
-    document.getElementById('loginFormElement')?.addEventListener('submit', handleLogin);
-    document.getElementById('addOrderBtn')?.addEventListener('click', handleAddOrder);
-    document.getElementById('addCostBtn')?.addEventListener('click', handleAddCost);
-    document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
+    
+    // Login Form
+    document.getElementById('loginFormElement').addEventListener('submit', handleLogin);
 }
 
 // ======================
@@ -90,8 +109,6 @@ function handleAuthState(user) {
 // ======================
 // Order Management
 // ======================
-let orders = [];
-
 async function loadOrders() {
     try {
         const ordersRef = collection(db, "orders");
@@ -106,11 +123,13 @@ async function loadOrders() {
 }
 
 function refreshOrderDisplays() {
+    // Update All Orders
     if (orderList) orderList.innerHTML = orders.map(createOrderCard).join('');
-    if (recentOrders) {
-        const pending = orders.filter(o => o.status !== 'Delivered').slice(0, 5);
-        recentOrders.innerHTML = pending.map(createOrderCard).join('');
-    }
+    
+    // Update Recent Orders (Pending)
+    const pendingOrders = orders.filter(o => o.status !== 'Delivered').slice(0, 5);
+    if (recentOrders) recentOrders.innerHTML = pendingOrders.map(createOrderCard).join('');
+    
     updateDashboard();
 }
 
@@ -121,7 +140,10 @@ function createOrderCard(order) {
                 <div class="order-id">${order.order_id}</div>
                 <select class="status-select ${statusClasses[order.status]}">
                     ${Object.keys(statusClasses)
-                        .map(status => `<option value="${status}" ${status === order.status ? 'selected' : ''}>${status}</option>`)
+                        .map(status => `
+                            <option value="${status}" ${status === order.status ? 'selected' : ''}>
+                                ${status}
+                            </option>`)
                         .join('')}
                 </select>
             </div>
@@ -165,8 +187,6 @@ function createOrderCard(order) {
 // ======================
 // Cost Management
 // ======================
-let costs = [];
-
 async function loadCosts() {
     try {
         const costsRef = collection(db, "costs");
@@ -182,60 +202,47 @@ async function loadCosts() {
 }
 
 function refreshCostsDisplay() {
-    if (!costsList) return;
-    
-    costsList.innerHTML = costs.map(cost => `
-        <div class="cost-item">
-            <div class="cost-header">
-                <span>৳${cost.amount}</span>
-                <span>${new Date(cost.date).toLocaleDateString()}</span>
+    if (costsList) {
+        costsList.innerHTML = costs.map(cost => `
+            <div class="cost-item">
+                <div class="cost-header">
+                    <span>৳${cost.amount}</span>
+                    <span>${new Date(cost.date).toLocaleDateString()}</span>
+                </div>
+                <div class="cost-details">
+                    <div><strong>${cost.category}</strong></div>
+                    <div>${cost.description || ''}</div>
+                </div>
             </div>
-            <div class="cost-details">
-                <div><strong>${cost.category}</strong></div>
-                <div>${cost.description || ''}</div>
-            </div>
-        </div>
-    `).join('');
+        `).join('');
+    }
+}
+
+// ======================
+// Dashboard Functions
+// ======================
+function updateDashboard() {
+    const totalOrders = orders.length;
+    const pendingOrders = orders.filter(o => o.status !== 'Delivered').length;
+    const completedOrders = orders.filter(o => o.status === 'Delivered').length;
+    const revenue = orders.reduce((sum, o) => sum + o.total_price, 0);
+    const totalCosts = costs.reduce((sum, c) => sum + c.amount, 0);
+    const deliveryCosts = orders.reduce((sum, o) => sum + o.delivery_charge, 0);
+    const netProfit = revenue - totalCosts - deliveryCosts;
+
+    // Update Dashboard Metrics
+    setDashboardValue('totalOrdersValue', totalOrders);
+    setDashboardValue('pendingOrdersValue', pendingOrders);
+    setDashboardValue('completedOrdersValue', completedOrders);
+    setDashboardValue('netProfitValue', netProfit);
+    setDashboardValue('revenueValue', revenue);
+    setDashboardValue('totalCostsValue', totalCosts);
+    setDashboardValue('deliveryCostsValue', deliveryCosts);
 }
 
 // ======================
 // Event Handlers
 // ======================
-async function handleButtonClicks(e) {
-    const card = e.target.closest('.order-card');
-    if (!card) return;
-
-    const orderId = card.dataset.id;
-    
-    if (e.target.classList.contains('delete-btn')) {
-        if (confirm("Are you sure you want to delete this order?")) {
-            try {
-                await deleteDoc(doc(db, "orders", orderId));
-                orders = orders.filter(o => o.id !== orderId);
-                refreshOrderDisplays();
-            } catch (error) {
-                showError(`Delete failed: ${error.message}`);
-            }
-        }
-    }
-}
-
-async function handleStatusChange(e) {
-    if (e.target.classList.contains('status-select')) {
-        const card = e.target.closest('.order-card');
-        const orderId = card.dataset.id;
-        const newStatus = e.target.value;
-        
-        try {
-            await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-            orders = orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o);
-            refreshOrderDisplays();
-        } catch (error) {
-            showError(`Status update failed: ${error.message}`);
-        }
-    }
-}
-
 async function handleAddOrder() {
     const orderData = {
         name: getValue('name'),
@@ -243,7 +250,7 @@ async function handleAddOrder() {
         phone: getValue('phone').replace(/\D/g, ''),
         drive_link: getValue('driveLink'),
         total_price: Number(getValue('totalPrice')) || 0,
-        delivery_system: getValue('deliverySystem'),
+        delivery_system: 'Home Delivery',
         delivery_charge: Number(getValue('deliveryCharge')) || 0,
         due_amount: Number(getValue('dueAmount')) || 0,
         status: 'Order Confirmed',
@@ -257,6 +264,7 @@ async function handleAddOrder() {
         await addDoc(collection(db, "orders"), orderData);
         clearOrderForm();
         loadOrders();
+        showSection('orderListSection');
     } catch (error) {
         showError(`Failed to add order: ${error.message}`);
     }
@@ -278,24 +286,72 @@ async function handleAddCost() {
     try {
         await addDoc(collection(db, "costs"), costData);
         loadCosts();
+        document.getElementById('costForm').reset();
     } catch (error) {
         showError(`Failed to add cost: ${error.message}`);
     }
 }
 
-// ======================
-// Helper Functions
-// ======================
-function updateDashboard() {
-    const revenue = orders.reduce((sum, o) => sum + o.total_price, 0);
-    const deliveryCosts = orders.reduce((sum, o) => sum + o.delivery_charge, 0);
-    const totalCosts = costs.reduce((sum, c) => sum + c.amount, 0);
-    const netProfit = revenue - totalCosts - deliveryCosts;
+async function handleStatusChange(event) {
+    if (event.target.classList.contains('status-select')) {
+        const card = event.target.closest('.order-card');
+        const orderId = card.dataset.id;
+        const newStatus = event.target.value;
 
-    setDashboardValue('netProfitValue', netProfit);
-    setDashboardValue('revenueValue', revenue);
-    setDashboardValue('totalCostsValue', totalCosts);
-    setDashboardValue('deliveryCostsValue', deliveryCosts);
+        try {
+            await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+            orders = orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o);
+            refreshOrderDisplays();
+        } catch (error) {
+            showError(`Status update failed: ${error.message}`);
+        }
+    }
+}
+
+document.addEventListener('click', async (event) => {
+    if (event.target.classList.contains('delete-btn')) {
+        const card = event.target.closest('.order-card');
+        const orderId = card.dataset.id;
+        
+        if (confirm("Are you sure you want to delete this order?")) {
+            try {
+                await deleteDoc(doc(db, "orders", orderId));
+                orders = orders.filter(o => o.id !== orderId);
+                refreshOrderDisplays();
+            } catch (error) {
+                showError(`Delete failed: ${error.message}`);
+            }
+        }
+    }
+});
+
+// ======================
+// Utility Functions
+// ======================
+function showSection(sectionId) {
+    // Hide all sections
+    ['dashboardSection', 'addOrderSection', 'orderListSection', 'costsSection']
+        .forEach(id => document.getElementById(id)?.classList.add('hidden'));
+    
+    // Show requested section
+    document.getElementById(sectionId)?.classList.remove('hidden');
+    
+    // Update active menu item
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    switch(sectionId) {
+        case 'dashboardSection':
+            document.getElementById('dashboardTab').classList.add('active');
+            break;
+        case 'addOrderSection':
+            document.getElementById('addNewOrderTab').classList.add('active');
+            break;
+        case 'orderListSection':
+            document.getElementById('allOrdersTab').classList.add('active');
+            break;
+        case 'costsSection':
+            document.getElementById('costsTab').classList.add('active');
+            break;
+    }
 }
 
 function filterOrders() {
@@ -328,7 +384,7 @@ function validateOrder(order) {
 }
 
 // ======================
-// UI Utilities
+// UI Functions
 // ======================
 function showAdminPanel() {
     document.getElementById('loginForm').classList.add('hidden');
@@ -349,18 +405,24 @@ function getValue(id) {
     return document.getElementById(id)?.value.trim() || '';
 }
 
-function setDashboardValue(id, amount) {
+function setDashboardValue(id, value) {
     const element = document.getElementById(id);
-    if (element) element.textContent = `৳${amount}`;
+    if (element) element.textContent = typeof value === 'number' ? value.toLocaleString() : value;
 }
 
 function showError(message) {
-    const errorDiv = document.getElementById('errorMessage');
-    if (errorDiv) {
-        errorDiv.textContent = message;
-        errorDiv.classList.remove('hidden');
-        setTimeout(() => errorDiv.classList.add('hidden'), 5000);
-    }
+    const errorDiv = document.getElementById('errorMessage') || createErrorElement();
+    errorDiv.textContent = message;
+    errorDiv.classList.remove('hidden');
+    setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+}
+
+function createErrorElement() {
+    const div = document.createElement('div');
+    div.id = 'errorMessage';
+    div.className = 'error hidden';
+    document.body.appendChild(div);
+    return div;
 }
 
 // ======================
@@ -369,6 +431,7 @@ function showError(message) {
 async function loadInitialData() {
     try {
         await Promise.all([loadOrders(), loadCosts()]);
+        updateDashboard();
     } catch (error) {
         showError(`Initialization error: ${error.message}`);
     }
